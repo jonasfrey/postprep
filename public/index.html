@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PostPrep — Instagram carousel arranger</title>
+    <meta name="description"
+      content="Arrange photos into overlapping 1:1 slides and export them for an Instagram carousel." />
+    <link rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23111218'/%3E%3Crect x='6' y='8' width='12' height='16' fill='%23ff2d55'/%3E%3Crect x='14' y='8' width='12' height='16' fill='%234da3ff' opacity='.85'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- ---------------------------------------------------------- projects -->
+      <aside class="sidebar sidebar--left">
+        <div class="brand">
+          <span class="brand__mark" aria-hidden="true"></span>
+          <div>
+            <strong>PostPrep</strong>
+            <small>carousel arranger</small>
+          </div>
+        </div>
+
+        <section class="panel">
+          <header class="panel__head">
+            <h2>Projects</h2>
+            <button class="btn btn--icon" data-action="new-project" title="New project">＋</button>
+          </header>
+          <div class="panel__body">
+            <ul id="project-list" class="projects"></ul>
+            <p id="projects-empty" class="empty">No projects yet — create one to start.</p>
+          </div>
+        </section>
+
+        <section class="panel panel--note">
+          <p class="hint">
+            Projects, layouts and exports are stored as plain files under
+            <code>data/</code> (<code>project.json</code>, <code>layout.json</code>,
+            <code>projects.jsonl</code>).
+          </p>
+        </section>
+      </aside>
+
+      <!-- -------------------------------------------------------------- main -->
+      <main class="main">
+        <header class="toolbar">
+          <div class="toolbar__group">
+            <button class="btn" data-action="arrange-strip"
+              title="Place images side by side with a small overlap">Auto-arrange</button>
+            <button class="btn" data-action="arrange-cascade"
+              title="Stack images with a slight offset">Cascade</button>
+            <button class="btn" data-action="arrange-slides"
+              title="One image per slide, scaled to cover">One per slide</button>
+            <button class="btn btn--ghost" data-action="clear-canvas">Clear</button>
+          </div>
+
+          <div class="toolbar__group">
+            <label
+              class="field"
+              for="overlap"
+              title="Overlap between neighbouring images; applied by Auto-arrange"
+            >
+              <span>Overlap</span>
+              <input id="overlap" type="range" min="0" max="60" step="1" value="15" />
+              <output id="overlap-value">15%</output>
+            </label>
+            <label class="field" for="frames">
+              <span>Slides</span>
+              <button class="btn btn--icon" data-action="frames-minus"
+                title="Fewer slides">−</button>
+              <input id="frames" class="input input--num" type="number" min="1" max="10" step="1"
+                value="1" />
+              <button class="btn btn--icon" data-action="frames-plus"
+                title="More slides">＋</button>
+              <label class="check" title="Grow the strip automatically as you add images">
+                <input id="frames-auto" type="checkbox" checked />
+                <span>auto</span>
+              </label>
+            </label>
+          </div>
+
+          <div class="toolbar__group">
+            <button class="btn btn--icon" data-action="zoom-out" title="Zoom out">−</button>
+            <span id="zoom-label" class="zoom-label">100%</span>
+            <button class="btn btn--icon" data-action="zoom-in" title="Zoom in">＋</button>
+            <button class="btn" data-action="zoom-fit" title="Fit the strip (F)">Fit</button>
+          </div>
+
+          <div class="toolbar__group">
+            <label class="check" title="Snap edges to slide boundaries and to other images">
+              <input id="toggle-snap" type="checkbox" checked />
+              <span>Snap</span>
+            </label>
+            <label class="check" title="Preview the slides separated the way a carousel shows them">
+              <input id="toggle-gaps" type="checkbox" />
+              <span>Slide gaps</span>
+            </label>
+            <label class="field" for="background">
+              <span>Background</span>
+              <input id="background" type="color" value="#ffffff" />
+            </label>
+            <label class="field" for="export-size">
+              <span>Export</span>
+              <select id="export-size" class="input">
+                <option value="1080">1080 × 1080</option>
+                <option value="1350">1350 × 1350</option>
+                <option value="1440">1440 × 1440</option>
+                <option value="2048">2048 × 2048</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="toolbar__group toolbar__group--end">
+            <button class="btn btn--icon" data-action="undo" title="Undo (Ctrl/Cmd+Z)">↶</button>
+            <button class="btn btn--icon" data-action="redo"
+              title="Redo (Ctrl/Cmd+Shift+Z)">↷</button>
+            <button class="btn" data-action="preview" id="preview-button"
+              title="Slide through the result the way a carousel shows it (P)">Preview</button>
+            <button class="btn btn--primary" data-action="export"
+              id="export-button">Export slides</button>
+          </div>
+        </header>
+
+        <div class="stage" id="stage">
+          <canvas id="canvas"></canvas>
+          <div class="stage__tools" id="stage-tools" hidden>
+            <button class="btn btn--small" data-action="toggle-mask" id="mask-toggle"
+              title="Hide the dark crop mask (M)">Remove mask</button>
+          </div>
+          <div class="stage__empty" id="stage-empty" hidden>
+            <h1>Start a project</h1>
+            <p>Upload a few photos, drag them into place so they overlap, then export the 1:1 slides for your carousel.</p>
+            <button class="btn btn--primary" data-action="new-project">New project</button>
+          </div>
+          <p class="stage__hint" id="stage-hint" hidden>
+            Drop images anywhere to upload them
+          </p>
+        </div>
+
+        <footer class="statusbar">
+          <span id="status-project" class="statusbar__item">No project open</span>
+          <span id="status-frames" class="statusbar__item"></span>
+          <span id="status-zoom" class="statusbar__item"></span>
+          <span id="status-warning" class="statusbar__item statusbar__item--warn"></span>
+          <span class="statusbar__spacer"></span>
+          <span id="status-save" class="statusbar__item statusbar__item--muted"></span>
+        </footer>
+      </main>
+
+      <!-- --------------------------------------------------------- inspector -->
+      <aside class="sidebar sidebar--right">
+        <section class="panel">
+          <header class="panel__head">
+            <h2>Images</h2>
+            <span class="badge" id="image-count">0</span>
+          </header>
+          <div class="panel__body">
+            <input id="file-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp"
+              multiple hidden />
+            <button class="btn btn--wide" data-action="upload">Upload images</button>
+            <ul id="image-list" class="thumbs"></ul>
+            <p id="images-empty" class="empty">PNG, JPEG, GIF or WebP up to 40&nbsp;MB each.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <header class="panel__head">
+            <h2>Layers</h2>
+            <span class="badge" id="layer-count">0</span>
+          </header>
+          <div class="panel__body">
+            <ul id="layer-list" class="layers"></ul>
+            <p id="layers-empty" class="empty">Place an image on the canvas to build the strip.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <header class="panel__head">
+            <h2>Selected image</h2>
+          </header>
+          <div class="panel__body">
+            <p id="selection-empty" class="empty">Click an image on the canvas to edit it.</p>
+            <div id="selection-fields" hidden>
+              <div class="grid2">
+                <label
+                  class="field field--stack"><span>X</span><input id="sel-x" class="input" type="number" step="1" /></label>
+                <label
+                  class="field field--stack"><span>Y</span><input id="sel-y" class="input" type="number" step="1" /></label>
+                <label
+                  class="field field--stack"><span>Width</span><input id="sel-w" class="input" type="number" step="1" min="1" /></label>
+                <label
+                  class="field field--stack"><span>Height</span><input id="sel-h" class="input" type="number" step="1" min="1" /></label>
+                <label
+                  class="field field--stack"><span>Scale %</span><input id="sel-scale" class="input" type="number" step="1" min="1" /></label>
+                <label
+                  class="field field--stack"><span>Slide</span><input id="sel-frame" class="input" type="number" step="1" min="1" /></label>
+              </div>
+              <div class="row row--wrap">
+                <button class="btn btn--small" data-action="sel-cover">Cover slide</button>
+                <button class="btn btn--small" data-action="sel-fit">Fit in slide</button>
+                <button class="btn btn--small" data-action="sel-height">Fill height</button>
+                <button class="btn btn--small" data-action="sel-center">Centre in slide</button>
+                <button class="btn btn--small" data-action="sel-front">To front</button>
+                <button class="btn btn--small" data-action="sel-back">To back</button>
+                <button class="btn btn--small btn--danger" data-action="sel-remove">Remove</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <header class="panel__head">
+            <h2>Export</h2>
+            <span class="badge" id="export-count">0</span>
+          </header>
+          <div class="panel__body">
+            <p class="hint"
+              id="export-summary">Everything visible in each red box is cropped into its own square image.</p>
+            <button class="btn btn--wide" data-action="preview" id="preview-button-2"
+              title="Slide through the result the way a carousel shows it (P)">Preview as carousel</button>
+            <button class="btn btn--primary btn--wide" data-action="export"
+              id="export-button-2">Export slides</button>
+            <button class="btn btn--wide" data-action="download-zip">Download all as .zip</button>
+            <div class="progress" id="export-progress" hidden>
+              <div class="progress__bar" id="export-progress-bar"></div>
+            </div>
+            <ul id="export-list" class="exports"></ul>
+            <button class="btn btn--ghost btn--small"
+              data-action="clear-exports">Clear export history</button>
+          </div>
+        </section>
+
+        <section class="panel panel--note">
+          <p class="hint">
+            <strong>Tips</strong> — drag to move, drag a corner to resize, <kbd>Alt</kbd>+drag ignores
+            snapping, <kbd>Space</kbd>+drag or middle-drag pans, wheel zooms, arrow keys nudge,
+            <kbd>Delete</kbd> removes from the layout.
+          </p>
+          <p class="hint">
+            The dark <strong>crop mask</strong> sits on the canvas, not on your photos, so the parts
+            that fall outside the slides stay fully visible but dimmed. Hit <kbd>M</kbd> or
+            <em>Remove mask</em> on the canvas to light up the whole arrangement; nothing changes in
+            the export either way.
+          </p>
+        </section>
+      </aside>
+    </div>
+
+    <!-- ------------------------------------------------- carousel preview -->
+    <div class="modal" id="preview-modal" hidden>
+      <div class="modal__backdrop" data-action="close-preview"></div>
+      <div class="modal__panel" role="dialog" aria-modal="true" aria-label="Carousel preview">
+        <header class="modal__head">
+          <div>
+            <h2>Carousel preview</h2>
+            <span class="hint" id="preview-meta">—</span>
+          </div>
+          <button class="btn btn--icon" data-action="close-preview" title="Close (Esc)">✕</button>
+        </header>
+
+        <div class="preview" id="preview-viewport" tabindex="0">
+          <div class="preview__track" id="preview-track"></div>
+          <button class="preview__nav preview__nav--prev" data-action="preview-prev"
+            title="Previous slide (←)" aria-label="Previous slide">‹</button>
+          <button class="preview__nav preview__nav--next" data-action="preview-next"
+            title="Next slide (→)" aria-label="Next slide">›</button>
+          <span class="preview__counter" id="preview-counter" hidden>1 / 1</span>
+          <p class="preview__status" id="preview-status" hidden></p>
+        </div>
+
+        <footer class="modal__foot">
+          <div class="preview__dots" id="preview-dots"></div>
+          <div class="row">
+            <button class="btn btn--small" data-action="preview-first">Back to slide 1</button>
+            <button class="btn btn--small" data-action="download-zip">Download all as .zip</button>
+          </div>
+        </footer>
+        <p class="hint modal__hint">
+          Drag the square to slide through the post the way the gallery does — the neighbouring
+          slide peeks in, exactly like it will on Instagram. Arrow keys, wheel and the dots navigate
+          too.
+        </p>
+      </div>
+    </div>
+
+    <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>
